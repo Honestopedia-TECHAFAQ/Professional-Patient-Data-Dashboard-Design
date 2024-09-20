@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patient Dashboard</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body {
+            background-color: #f4f4f4;
+        }
+
+        .dashboard {
+            margin: 20px;
+            padding: 20px;
+            border-radius: 5px;
+            background: #fff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1, h2 {
+            color: #333;
+        }
+
+        table {
+            margin-bottom: 20px;
+        }
+
+        .chart-container {
+            max-width: 600px;
+            margin: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container dashboard">
+        <h1 class="text-center">Patient Dashboard</h1>
+        <div class="summary">
+            <h2>Summary</h2>
+            <p>Total Patients: <span id="total-patients">0</span></p>
+            <p>Common Conditions: <span id="common-conditions">None</span></p>
+        </div>
+        <div class="mb-3">
+            <input type="text" id="searchInput" class="form-control" placeholder="Search by name or condition" onkeyup="filterPatients()">
+        </div>
+        <div class="patient-data">
+            <h2>Patient Data</h2>
+            <table class="table table-bordered table-striped" id="patient-table">
+                <thead class="thead-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Age</th>
+                        <th>Condition</th>
+                        <th>Medical History</th>
+                        <th>Percentage</th>
+                        <th>Other Info</th>
+                    </tr>
+                </thead>
+                <tbody>
+                
+                </tbody>
+            </table>
+        </div>
+        <div class="chart-container">
+            <canvas id="myChart"></canvas>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.16.9/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        let allPatients = [];
+
+        async function loadPatientData() {
+            const response = await fetch('charts.xlsx'); 
+            const data = await response.arrayBuffer();
+            const workbook = XLSX.read(data, { type: 'array' });
+
+            const sheetName = workbook.SheetNames[0];
+            const sheet = workbook.Sheets[sheetName];
+            allPatients = XLSX.utils.sheet_to_json(sheet);
+
+            populateDashboard(allPatients);
+        }
+
+        function populateDashboard(patients) {
+            const tableBody = document.getElementById('patient-table').getElementsByTagName('tbody')[0];
+            tableBody.innerHTML = '';
+            let totalPatients = patients.length;
+            let conditionsCount = {};
+
+            patients.forEach(patient => {
+                const row = tableBody.insertRow();
+                row.insertCell(0).textContent = patient.Name;
+                row.insertCell(1).textContent = patient.Age;
+                row.insertCell(2).textContent = patient.Condition;
+                row.insertCell(3).textContent = patient.MedicalHistory;
+                row.insertCell(4).textContent = patient.Percentage || 'N/A'; 
+                row.insertCell(5).textContent = patient.OtherInfo || 'N/A'; 
+                conditionsCount[patient.Condition] = (conditionsCount[patient.Condition] || 0) + 1;
+            });
+            document.getElementById('total-patients').textContent = totalPatients;
+            const commonCondition = Object.keys(conditionsCount).reduce((a, b) => conditionsCount[a] > conditionsCount[b] ? a : b, '');
+            document.getElementById('common-conditions').textContent = commonCondition;
+            createChart(conditionsCount);
+        }
+
+        function createChart(conditionsCount) {
+            const ctx = document.getElementById('myChart').getContext('2d');
+            const labels = Object.keys(conditionsCount);
+            const data = Object.values(conditionsCount);
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Number of Patients by Condition',
+                        data: data,
+                        backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        function filterPatients() {
+            const input = document.getElementById('searchInput');
+            const filter = input.value.toLowerCase();
+            const filteredPatients = allPatients.filter(patient => 
+                patient.Name.toLowerCase().includes(filter) || 
+                patient.Condition.toLowerCase().includes(filter)
+            );
+            populateDashboard(filteredPatients);
+        }
+        loadPatientData();
+    </script>
+</body>
+</html>
